@@ -55,7 +55,8 @@ async def process_file(
     vector_ids = []
     for i, chunk in enumerate(chunks):
         try:
-            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-large")
+            # Utilise bien le modèle "text-embedding-3-small" (1024 dimensions)
+            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-small")
             embedding = response.data[0].embedding
         except Exception as e:
             return {"error": f"Erreur OpenAI sur le chunk {i} : {str(e)}"}
