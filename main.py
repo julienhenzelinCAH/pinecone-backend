@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 import openai
+print("OPENAI VERSION:", openai.__version__)
 import uuid
 import os
 from pinecone import Pinecone
