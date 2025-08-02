@@ -26,7 +26,12 @@ async def process_file(
     content = await data.read()
     try:
         json_data = json.loads(content)
-        text = json_data.get("text", "")
+        # Prend en charge le cas n8n (json sous forme de liste)
+        if isinstance(json_data, list):
+            data_json = json_data[0]
+        else:
+            data_json = json_data
+        text = data_json.get("text", "")
     except Exception as e:
         return {"error": str(e)}
     if not text:
