@@ -16,6 +16,10 @@ openai.api_key = OPENAI_API_KEY
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("prospectsupport")
 
+def split_text(text, max_chars=15000):
+    # Split le texte en chunks de 15000 caractères (sûr pour 8192 tokens OpenAI)
+    return [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
+
 @app.post("/process")
 async def process_file(
     data: UploadFile = File(...),
@@ -46,23 +50,28 @@ async def process_file(
     if not text.strip():
         return {"error": "Aucun texte extrait du fichier."}
 
-    # Vectorisation OpenAI
-    try:
-        response = openai.embeddings.create(input=[text], model="text-embedding-3-large")
-        embedding = response.data[0].embedding
-    except Exception as e:
-        return {"error": f"Erreur OpenAI : {str(e)}"}
+    # Découpage en chunks pour ne pas dépasser la limite OpenAI
+    chunks = split_text(text)
+    vector_ids = []
+    for i, chunk in enumerate(chunks):
+        try:
+            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-large")
+            embedding = response.data[0].embedding
+        except Exception as e:
+            return {"error": f"Erreur OpenAI sur le chunk {i} : {str(e)}"}
 
-    # Injection dans Pinecone
-    try:
-        vector_id = str(uuid.uuid4())
-        index.upsert([(vector_id, embedding, {"source": filename})])
-    except Exception as e:
-        return {"error": f"Erreur Pinecone : {str(e)}"}
+        # Injection dans Pinecone
+        try:
+            vector_id = str(uuid.uuid4())
+            index.upsert([(vector_id, embedding, {"source": filename, "chunk": i})])
+            vector_ids.append(vector_id)
+        except Exception as e:
+            return {"error": f"Erreur Pinecone sur le chunk {i} : {str(e)}"}
 
     return {
         "message": "Success",
         "filename": filename,
-        "vector_id": vector_id,
+        "chunks": len(chunks),
+        "vector_ids": vector_ids,
         "text_len": len(text)
     }
