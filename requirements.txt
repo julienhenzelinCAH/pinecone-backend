@@ -3,3 +3,4 @@ uvicorn
 openai
 pinecone
 python-multipart
+PyPDF2
