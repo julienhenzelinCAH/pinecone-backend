@@ -1,6 +1,6 @@
+PyPDF2
 fastapi
 uvicorn
 openai
 pinecone
 python-multipart
-PyPDF2
