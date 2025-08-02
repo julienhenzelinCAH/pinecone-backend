@@ -35,6 +35,7 @@ async def process_file(
         try:
             text = content.decode('utf-8')
         except Exception as e:
+            print("Erreur TXT:", e)
             return {"error": f"Impossible de décoder le fichier TXT : {str(e)}"}
     elif ext == '.pdf':
         try:
@@ -43,11 +44,14 @@ async def process_file(
             pdf = PyPDF2.PdfReader(BytesIO(content))
             text = "\n".join(page.extract_text() or "" for page in pdf.pages)
         except Exception as e:
+            print("Erreur PDF:", e)
             return {"error": f"Impossible d'extraire le texte PDF : {str(e)}"}
     else:
+        print("Type de fichier non supporté :", ext)
         return {"error": f"Type de fichier non supporté : {ext}. Utilisez .txt ou .pdf uniquement."}
 
     if not text.strip():
+        print("Aucun texte extrait du fichier.")
         return {"error": "Aucun texte extrait du fichier."}
 
     # Découpage en chunks pour ne pas dépasser la limite OpenAI
@@ -55,10 +59,12 @@ async def process_file(
     vector_ids = []
     for i, chunk in enumerate(chunks):
         try:
-            # Utilise bien le modèle "text-embedding-3-small" (1024 dimensions)
+            print("MODEL USED:", "text-embedding-3-small")
             response = openai.embeddings.create(input=[chunk], model="text-embedding-3-small")
             embedding = response.data[0].embedding
+            print("VECTOR LENGTH:", len(embedding))
         except Exception as e:
+            print("Erreur OpenAI sur le chunk", i, ":", e)
             return {"error": f"Erreur OpenAI sur le chunk {i} : {str(e)}"}
 
         # Injection dans Pinecone
@@ -67,8 +73,10 @@ async def process_file(
             index.upsert([(vector_id, embedding, {"source": filename, "chunk": i})])
             vector_ids.append(vector_id)
         except Exception as e:
+            print("Erreur Pinecone sur le chunk", i, ":", e)
             return {"error": f"Erreur Pinecone sur le chunk {i} : {str(e)}"}
 
+    print("INDEXATION SUCCESS. Fichier:", filename, "Chunks:", len(chunks))
     return {
         "message": "Success",
         "filename": filename,
