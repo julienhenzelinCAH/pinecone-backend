@@ -1,7 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 import openai
-print("OPENAI VERSION:", openai.__version__)
 import uuid
 import os
 from pinecone import Pinecone
@@ -9,16 +8,17 @@ from pinecone import Pinecone
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"])
 
-# 🔐 Clés API depuis les variables d'environnement Render
+# Clés API depuis les variables d'environnement Render
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
+print("OPENAI VERSION:", openai.__version__)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index("prospectsupport")
 
 def split_text(text, max_chars=15000):
-    # Split le texte en chunks de 15000 caractères (sûr pour 8192 tokens OpenAI)
+    # Découpe le texte en chunks de 15000 caractères (≈8192 tokens OpenAI)
     return [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
 
 @app.post("/process")
@@ -55,7 +55,7 @@ async def process_file(
         print("Aucun texte extrait du fichier.")
         return {"error": "Aucun texte extrait du fichier."}
 
-    # Découpage en chunks pour ne pas dépasser la limite OpenAI
+    # Découpage en chunks pour OpenAI
     chunks = split_text(text)
     vector_ids = []
     for i, chunk in enumerate(chunks):
