@@ -1,18 +1,18 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 import openai
-import pinecone
 import uuid
 import json
 import os
+from pinecone import Pinecone
 
 # 🔐 Variables d'environnement recommandées sur Render !
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
 openai.api_key = OPENAI_API_KEY
-pinecone.init(api_key=PINECONE_API_KEY, environment="gcp-europe-west4")
-index = pinecone.Index("prospectsupport")
+pc = Pinecone(api_key=PINECONE_API_KEY)
+index = pc.Index("prospectsupport")
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"])
