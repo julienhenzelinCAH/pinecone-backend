@@ -8,7 +8,7 @@ from pinecone import Pinecone
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"])
 
-# Clés API depuis les variables d'environnement Render
+# Configuration API KEYS depuis Render (sécurité optimale)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
