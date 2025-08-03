@@ -15,7 +15,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 openai.api_key = OPENAI_API_KEY
 print("OPENAI VERSION:", openai.__version__)
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("prospectsupport")
+index = pc.Index("prospectsupport1536")
 
 def split_text(text, max_chars=15000):
     # Découpe le texte en chunks de 15000 caractères (≈8192 tokens OpenAI)
