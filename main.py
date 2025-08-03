@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-import openai
+from openai import OpenAI  # Import corrigé pour v1.x
 import uuid
 import os
 from pinecone import Pinecone
@@ -12,10 +12,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"])
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
-openai.api_key = OPENAI_API_KEY
-print("OPENAI VERSION:", openai.__version__)
+# Initialisation du client OpenAI (syntaxe v1.x)
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+print("OPENAI CLIENT INITIALIZED")
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("prospectsupport1536")  # Index dimension 1536
+index = pc.Index("prospectsupport")
 
 def split_text(text, max_chars=15000):
     # Découpe le texte en chunks de 15000 caractères (≈8192 tokens OpenAI)
@@ -25,7 +27,7 @@ def split_text(text, max_chars=15000):
 async def process_file(
     data: UploadFile = File(...),
     filename: str = Form(...),
-    index_name: str = Form("prospectsupport1536")
+    index_name: str = Form("prospectsupport")
 ):
     ext = os.path.splitext(filename)[1].lower()
     content = await data.read()
@@ -58,10 +60,15 @@ async def process_file(
     # Découpage en chunks pour OpenAI
     chunks = split_text(text)
     vector_ids = []
+
     for i, chunk in enumerate(chunks):
         try:
             print("MODEL USED:", "text-embedding-3-small")
-            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-small")
+            # Syntaxe corrigée pour OpenAI v1.x
+            response = client.embeddings.create(
+                input=[chunk],
+                model="text-embedding-3-small"
+            )
             embedding = response.data[0].embedding
             print("VECTOR LENGTH:", len(embedding))
         except Exception as e:
