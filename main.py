@@ -60,8 +60,8 @@ async def process_file(
     vector_ids = []
     for i, chunk in enumerate(chunks):
         try:
-            print("MODEL USED:", "text-embedding-ada-002")
-            response = openai.embeddings.create(input=[chunk], model="text-embedding-ada-002")
+            print("MODEL USED:", "text-embedding-3-small")
+            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-small")
             embedding = response.data[0].embedding
             print("VECTOR LENGTH:", len(embedding))
         except Exception as e:
