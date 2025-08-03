@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
@@ -52,7 +53,8 @@ def split_text(text, max_chars=15000):
 async def process_file(
     data: UploadFile = File(...),
     filename: str = Form(...),
-    index_name: str = Form("prospectsupport1536")
+    index_name: str = Form("prospectsupport1536"),
+    namespace: str = Form("production")
 ):
     ext = os.path.splitext(filename)[1].lower()
     content = await data.read()
@@ -91,6 +93,7 @@ async def process_file(
             print("MODEL USED:", EMBEDDING_MODEL)
             print("TARGET DIMENSIONS:", TARGET_DIMENSIONS)
             print("TARGET INDEX:", INDEX_NAME)
+            print("NAMESPACE USED:", namespace)
 
             # Utilisation du client avec gestion des deux versions
             openai_client = get_openai_client()
@@ -121,17 +124,17 @@ async def process_file(
             print("Erreur OpenAI sur le chunk", i, ":", e)
             return {"error": f"Erreur OpenAI sur le chunk {i} : {str(e)}"}
 
-        # Injection dans Pinecone
+        # Injection dans Pinecone avec namespace
         try:
             vector_id = str(uuid.uuid4())
-            index.upsert([(vector_id, embedding, {"source": filename, "chunk": i})])
+            index.upsert([(vector_id, embedding, {"source": filename, "chunk": i})], namespace=namespace)
             vector_ids.append(vector_id)
-            print(f"Chunk {i} indexé avec succès - ID: {vector_id}")
+            print(f"Chunk {i} indexé avec succès dans namespace '{namespace}' - ID: {vector_id}")
         except Exception as e:
             print("Erreur Pinecone sur le chunk", i, ":", e)
             return {"error": f"Erreur Pinecone sur le chunk {i} : {str(e)}"}
 
-    print("INDEXATION SUCCESS. Fichier:", filename, "Chunks:", len(chunks))
+    print("INDEXATION SUCCESS. Fichier:", filename, "Chunks:", len(chunks), "Namespace:", namespace)
     return {
         "message": "Success",
         "filename": filename,
@@ -140,5 +143,6 @@ async def process_file(
         "text_len": len(text),
         "model_used": EMBEDDING_MODEL,
         "dimensions": TARGET_DIMENSIONS,
-        "index_used": INDEX_NAME
+        "index_used": INDEX_NAME,
+        "namespace": namespace
     }
