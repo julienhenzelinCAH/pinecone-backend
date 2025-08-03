@@ -15,7 +15,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 openai.api_key = OPENAI_API_KEY
 print("OPENAI VERSION:", openai.__version__)
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("prospectsupport1536")
+index = pc.Index("prospectsupport1536")  # Index dimension 1536
 
 def split_text(text, max_chars=15000):
     # Découpe le texte en chunks de 15000 caractères (≈8192 tokens OpenAI)
@@ -25,7 +25,7 @@ def split_text(text, max_chars=15000):
 async def process_file(
     data: UploadFile = File(...),
     filename: str = Form(...),
-    index_name: str = Form("prospectsupport")
+    index_name: str = Form("prospectsupport1536")
 ):
     ext = os.path.splitext(filename)[1].lower()
     content = await data.read()
@@ -60,8 +60,8 @@ async def process_file(
     vector_ids = []
     for i, chunk in enumerate(chunks):
         try:
-            print("MODEL USED:", "text-embedding-3-small")
-            response = openai.embeddings.create(input=[chunk], model="text-embedding-3-small")
+            print("MODEL USED:", "text-embedding-ada-002")
+            response = openai.embeddings.create(input=[chunk], model="text-embedding-ada-002")
             embedding = response.data[0].embedding
             print("VECTOR LENGTH:", len(embedding))
         except Exception as e:
