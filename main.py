@@ -1,6 +1,5 @@
 from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI  # Import corrigé pour v1.x
 import uuid
 import os
 from pinecone import Pinecone
@@ -12,12 +11,38 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"])
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 
-# Initialisation du client OpenAI (syntaxe v1.x)
-client = OpenAI(api_key=OPENAI_API_KEY)
+# Client OpenAI initialisé de manière retardée
+client = None
 
-print("OPENAI CLIENT INITIALIZED")
+def get_openai_client():
+    global client
+    if client is None:
+        try:
+            # Tentative avec la nouvelle syntaxe OpenAI v1.x
+            from openai import OpenAI
+            client = OpenAI(api_key=OPENAI_API_KEY)
+            print("OPENAI CLIENT INITIALIZED (v1.x)")
+        except Exception as e:
+            try:
+                # Fallback vers l'ancienne syntaxe si nécessaire
+                import openai
+                openai.api_key = OPENAI_API_KEY
+                client = openai
+                print("OPENAI CLIENT INITIALIZED (v0.x fallback)")
+            except Exception as e2:
+                print(f"Erreur initialisation OpenAI: {e}, {e2}")
+                raise e
+    return client
+
 pc = Pinecone(api_key=PINECONE_API_KEY)
-index = pc.Index("prospectsupport")
+
+# Configuration Option 1: Maximum Performance
+# text-embedding-3-small avec dimensions complètes (1536) sur index prospectsupport1536
+EMBEDDING_MODEL = "text-embedding-3-small"
+TARGET_DIMENSIONS = 1536
+INDEX_NAME = "prospectsupport1536"
+
+index = pc.Index(INDEX_NAME)
 
 def split_text(text, max_chars=15000):
     # Découpe le texte en chunks de 15000 caractères (≈8192 tokens OpenAI)
@@ -27,7 +52,7 @@ def split_text(text, max_chars=15000):
 async def process_file(
     data: UploadFile = File(...),
     filename: str = Form(...),
-    index_name: str = Form("prospectsupport")
+    index_name: str = Form("prospectsupport1536")
 ):
     ext = os.path.splitext(filename)[1].lower()
     content = await data.read()
@@ -63,14 +88,35 @@ async def process_file(
 
     for i, chunk in enumerate(chunks):
         try:
-            print("MODEL USED:", "text-embedding-3-small")
-            # Syntaxe corrigée pour OpenAI v1.x
-            response = client.embeddings.create(
-                input=[chunk],
-                model="text-embedding-3-small"
-            )
+            print("MODEL USED:", EMBEDDING_MODEL)
+            print("TARGET DIMENSIONS:", TARGET_DIMENSIONS)
+            print("TARGET INDEX:", INDEX_NAME)
+
+            # Utilisation du client avec gestion des deux versions
+            openai_client = get_openai_client()
+
+            # Vérification du type de client pour adapter la syntaxe
+            if hasattr(openai_client, 'embeddings') and hasattr(openai_client.embeddings, 'create'):
+                # Nouvelle syntaxe OpenAI v1.x - dimensions complètes par défaut
+                response = openai_client.embeddings.create(
+                    input=[chunk],
+                    model=EMBEDDING_MODEL
+                )
+            else:
+                # Ancienne syntaxe OpenAI v0.x
+                response = openai_client.Embedding.create(
+                    input=[chunk],
+                    model=EMBEDDING_MODEL
+                )
+
             embedding = response.data[0].embedding
             print("VECTOR LENGTH:", len(embedding))
+
+            # Vérification que les dimensions correspondent
+            if len(embedding) != TARGET_DIMENSIONS:
+                print(f"ATTENTION: Dimension mismatch! Expected {TARGET_DIMENSIONS}, got {len(embedding)}")
+                return {"error": f"Dimension mismatch: Expected {TARGET_DIMENSIONS}, got {len(embedding)}"}
+
         except Exception as e:
             print("Erreur OpenAI sur le chunk", i, ":", e)
             return {"error": f"Erreur OpenAI sur le chunk {i} : {str(e)}"}
@@ -80,6 +126,7 @@ async def process_file(
             vector_id = str(uuid.uuid4())
             index.upsert([(vector_id, embedding, {"source": filename, "chunk": i})])
             vector_ids.append(vector_id)
+            print(f"Chunk {i} indexé avec succès - ID: {vector_id}")
         except Exception as e:
             print("Erreur Pinecone sur le chunk", i, ":", e)
             return {"error": f"Erreur Pinecone sur le chunk {i} : {str(e)}"}
@@ -90,5 +137,8 @@ async def process_file(
         "filename": filename,
         "chunks": len(chunks),
         "vector_ids": vector_ids,
-        "text_len": len(text)
+        "text_len": len(text),
+        "model_used": EMBEDDING_MODEL,
+        "dimensions": TARGET_DIMENSIONS,
+        "index_used": INDEX_NAME
     }
